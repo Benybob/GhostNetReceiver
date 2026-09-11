@@ -1,0 +1,32 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Local runtime / user data
+data/
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+session.log
+session.log.*
+
+# Build outputs (installer lives next to the repo, not inside it)
+build/
+dist/
+release/
+SHA256SUMS.txt
+
+# Local review and build records (sanitized conclusions are in REVIEW_FIXES.md)
+work/
+docs/
+REVIEW.md
+
+# Codex/Grok work products — keep scripts, not caches
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
