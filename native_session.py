@@ -367,7 +367,16 @@ class NativeSession:
             ident = self.config.get('kiwi_url') or self.config.get('audio_device') or self.config.get('usb_args') or kind
             self.metrics['receivers'].append(ident)
             speeds = enabled_modes(self.config)
-            rtty = RttyDecoder(reverse=self.config.get('rtty_reverse',False))
+            rtty = self._new_rtty()
+            rtty_capture = None
+            rtty_capture_path = None
+
+            def close_rtty_capture():
+                nonlocal rtty_capture
+                capture, rtty_capture = rtty_capture, None
+                if capture is not None:
+                    capture.close()
+                    self.report('Saved RTTY calibration audio to ' + str(rtty_capture_path))
             converter = None
             dumped = False
             next_hamlib = 0
@@ -400,6 +409,7 @@ class NativeSession:
                     reason = new_reason
                     self.report(reason)
                 if hz != self.hz or decode != self.decode_mode:
+                    close_rtty_capture()
                     if kind == 'kiwi' and not self.station.get('low',0) <= hz <= self.station.get('high',30_000_000):
                         raise ReceiverUnavailable('Selected receiver does not cover the scheduled band')
                     self.confirmed_hz = 0
@@ -417,13 +427,14 @@ class NativeSession:
                     if pool:
                         pool.stable()
                 if self.audio_overflow:
+                    close_rtty_capture()
                     self.audio_overflow = False
                     self.metrics['overflows'] += 1
                     self.metrics['audio_gaps'] += 1
                     self.clock.reset()
                     logger.assembler.clear()
                     converter = None
-                    rtty = RttyDecoder(reverse=self.config.get('rtty_reverse',False))
+                    rtty = self._new_rtty()
                     hunt_locked = False
                     last_sequence = None
                     while not self.audio.empty():
@@ -438,6 +449,7 @@ class NativeSession:
                     self.metrics['audio_packets'] += 1
                     gap = seq is not None and last_sequence is not None and ((seq - last_sequence) & 0xffffffff) != 1
                     if gap or generation != last_generation:
+                        close_rtty_capture()
                         self.metrics['audio_gaps'] += 1
                         self.report('Audio gap or frequency change: restarting decoder alignment')
                         self.clock.reset()
@@ -445,7 +457,7 @@ class NativeSession:
                         empty_normal = 0
                         hunt_locked = False
                         converter = None
-                        rtty = RttyDecoder(reverse=self.config.get('rtty_reverse',False))
+                        rtty = self._new_rtty()
                     last_sequence = seq
                     last_generation = generation
                     if converter is None or converter.rate != int(rate):
@@ -462,6 +474,17 @@ class NativeSession:
                     rms = float(np.sqrt(np.mean(samples.astype(np.float32) ** 2))) / 32768.0
                     self.metrics['level'] = min(1.0, rms * 6)
                     if self.decode_mode == 'RTTY':
+                        if self.config.get('record_rtty', True):
+                            if rtty_capture is None:
+                                folder = Path(self.data_dir) / 'net-night'
+                                folder.mkdir(parents=True, exist_ok=True)
+                                lane = ''.join(c.lower() if c.isalnum() else '-' for c in self.config.get('lane_name','')).strip('-')
+                                suffix = ('-' + lane) if lane else ''
+                                rtty_capture_path = folder / f'rtty-{int(receipt)}-{time.time_ns()}{suffix}.wav'
+                                rtty_capture = wave.open(str(rtty_capture_path), 'wb')
+                                rtty_capture.setnchannels(1);rtty_capture.setsampwidth(2);rtty_capture.setframerate(12000)
+                                self.report('Recording RTTY calibration audio to ' + str(rtty_capture_path))
+                            rtty_capture.writeframesraw(np.ascontiguousarray(samples,dtype=np.int16).tobytes())
                         for line in rtty.feed(samples):
                             packet = {
                                 'type': 'RTTY.CHUNK', 'value': line,
@@ -548,6 +571,11 @@ class NativeSession:
                         next_hamlib = now + 5
                         self._hamlib_check()
         finally:
+            if 'rtty_capture' in locals() and rtty_capture is not None:
+                try:
+                    close_rtty_capture()
+                except Exception as exc:
+                    self.report('RTTY calibration audio could not be finalized: ' + str(exc))
             if self.receiver:
                 self.receiver.stop()
 
@@ -572,7 +600,7 @@ class NativeSession:
                 int(self.config.get('hamlib_port') or 4532),
             )
             self.confirmed_hz = int(info['actual'])
-            self.updates.put(('cat', f"Radio reads {info['actual']/1e6:.6f} MHz; requested {wanted/1e6:.6f} MHz USB"))
+            self.updates.put(('cat', f"Radio reads {info['actual']/1e6:.6f} MHz; requested {wanted/1e6:.6f} MHz {self.latest_plan.get('sideband', 'USB')} (mode not verified)"))
             if not info['ok']:
                 self.report(
                     f"Radio reads {info['actual']/1e6:.6f} MHz; schedule wants {info['expected']/1e6:.6f} MHz "
@@ -588,8 +616,15 @@ class NativeSession:
         self.generation += 1
         self.updates.put(('cat', f'Operator confirmed {self.hz/1e6:.6f} MHz USB'))
 
-    def set_monitor(self, on, device_name='', volume=0.3):
+    def _new_rtty(self):
+        return RttyDecoder(
+            reverse=self.config.get('rtty_reverse', False),
+            center_hz=float(self.config.get('rtty_center_hz') or 2210),
+        )
+
+    def set_monitor(self, on, device_name='', volume=0.3, agc=False):
         self.monitor.volume = max(0.0,min(1.0,float(volume)))
+        self.monitor.agc = bool(agc)
         self.monitor.set_enabled(bool(on), device_name)
         if on:
             self.report('Speaker monitor on — you are hearing receive audio only. This does not transmit.')

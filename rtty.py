@@ -77,8 +77,11 @@ def synthesize(text, seconds=None):
 
 
 class RttyDecoder:
-    def __init__(self, reverse=False):
+    def __init__(self, reverse=False, center_hz=2210.0):
         self.reverse = bool(reverse)
+        self.center_hz = float(center_hz)
+        if not 500 <= self.center_hz <= 3500:
+            raise ValueError('RTTY audio center must be 500 through 3500 Hz')
         self.buffer = np.empty(0, dtype=np.int16)
         self.figures = False
         self.pending = ''
@@ -152,5 +155,5 @@ class RttyDecoder:
 
     def _mark(self, chunk):
         audio = chunk.astype(np.float64)
-        mark = goertzel(audio, MARK_HZ) >= goertzel(audio, SPACE_HZ)
+        mark = goertzel(audio, self.center_hz + 85) >= goertzel(audio, self.center_hz - 85)
         return (not mark) if self.reverse else mark

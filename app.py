@@ -21,9 +21,9 @@ ROOT=runtime_root()
 DATA_ROOT=default_data_dir()
 DEFAULTS={'region':REGIONS[0],'source':SOURCE_KIWI,'automatic_receiver':True,'kiwi_url':'',
           'latitude':'','longitude':'','usb_args':'','gain':'30','audio_device':'',
-          'tuning':'Automatic schedule','js8_speeds':'Normal + Fast','rtty':False,'rtty_reverse':False,'record_net':True,
+          'tuning':'Automatic schedule','js8_speeds':'Normal + Fast','rtty':False,'rtty_reverse':False,'rtty_center_hz':'2210','record_net':True,'record_rtty':True,
           'alerts':True,'quiet_enabled':True,'quiet_start':'22','quiet_end':'7',
-          'flash_override':True,'alert_sound':False,'speaker_device':'','monitor_volume':'0.3','multi_region':False,
+          'flash_override':True,'alert_sound':False,'speaker_device':'','monitor_volume':'0.3','monitor_agc':True,'multi_region':False,
           'hamlib_enabled':False,'hamlib_host':'127.0.0.1','hamlib_port':'4532'}
 
 class App(tk.Tk):
@@ -70,6 +70,7 @@ class App(tk.Tk):
         self.station=tk.StringVar(value='An online receiver is selected automatically. No radio hardware needed.')
         self.summary=tk.StringVar(value='Your messages stay on this computer.')
         self.banner=tk.StringVar(value='Start listening to follow the published GhostNet hour.')
+        self.cat_status=tk.StringVar(value='Radio readback: not enabled')
         self.search=tk.StringVar()
         self.tagged=tk.BooleanVar(value=True)
         self.items={}
@@ -103,6 +104,7 @@ class App(tk.Tk):
         self.tuned_button.pack(side='left')
         ttk.Label(top,textvariable=self.status,font=('Segoe UI',12,'bold'),wraplength=960).pack(anchor='w',pady=(10,0))
         ttk.Label(top,textvariable=self.banner,font=('Segoe UI',16,'bold'),foreground='#f3d48b',wraplength=1000).pack(anchor='w',pady=(6,0))
+        ttk.Label(top,textvariable=self.cat_status,foreground='#8fc5dc',wraplength=960).pack(anchor='w')
         ttk.Label(top,textvariable=self.station,foreground='#a9bdca',wraplength=960).pack(anchor='w')
         meter=ttk.Frame(top);meter.pack(anchor='w',pady=(4,0))
         ttk.Label(meter,text='Audio').pack(side='left')
@@ -123,9 +125,10 @@ class App(tk.Tk):
         self.advanced.bind('<Configure>',lambda e:canvas.configure(scrollregion=canvas.bbox('all')))
         canvas.bind('<Configure>',lambda e:canvas.itemconfigure(panel,width=e.width))
         self.regional=ttk.Frame(self.tabs,padding=10)
+        self.guide=ttk.Frame(self.tabs,padding=12)
         self.activity=ttk.Frame(self.tabs,padding=12)
-        for frame,title in [(self.inbox,'All messages'),(self.regional,'Regional feeds'),(self.schedule,'Next scheduled nets'),(self.advanced_tab,'Advanced'),(self.activity,'Activity')]:self.tabs.add(frame,text=title)
-        self.build_inbox();self.build_advanced()
+        for frame,title in [(self.inbox,'All messages'),(self.regional,'Regional feeds'),(self.schedule,'Next scheduled nets'),(self.guide,'Net-night guide'),(self.advanced_tab,'Advanced'),(self.activity,'Activity')]:self.tabs.add(frame,text=title)
+        self.build_inbox();self.build_advanced();self.build_guide()
         self.build_regional()
         self.preferences=ttk.Frame(self.tabs,padding=15);self.tabs.insert(2,self.preferences,text='Alerts & updates')
         self.build_preferences()
@@ -202,15 +205,44 @@ class App(tk.Tk):
         ttk.Button(location,text='Refresh audio devices',command=self.refresh_audio_devices).pack(side='left',padx=8)
         ttk.Checkbutton(self.advanced,text='Decode published 45.45 baud RTTY (7.077 MHz, preview)',variable=self.vars['rtty']).grid(row=13,column=0,columnspan=2,sticky='w',pady=4)
         ttk.Checkbutton(self.advanced,text='Reverse RTTY mark/space (USB polarity)',variable=self.vars['rtty_reverse']).grid(row=14,column=0,columnspan=2,sticky='w',pady=2)
-        ttk.Checkbutton(self.advanced,text='Save a net-night WAV when GhostNet-tagged JS8 is copied',variable=self.vars['record_net']).grid(row=15,column=0,columnspan=2,sticky='w',pady=4)
+        tone=ttk.Frame(self.advanced);tone.grid(row=15,column=0,columnspan=2,sticky='w',pady=2)
+        ttk.Label(tone,text='RTTY audio center (Hz)').pack(side='left');ttk.Entry(tone,textvariable=self.vars['rtty_center_hz'],width=8).pack(side='left',padx=6)
+        ttk.Label(tone,text='170 Hz shift · default 2210').pack(side='left')
+        ttk.Checkbutton(self.advanced,text='Save a net-night WAV when GhostNet-tagged JS8 is copied',variable=self.vars['record_net']).grid(row=16,column=0,columnspan=2,sticky='w',pady=4)
+        ttk.Checkbutton(self.advanced,text='Gentle automatic level control for Hear audio only',variable=self.vars['monitor_agc']).grid(row=17,column=0,columnspan=2,sticky='w',pady=4)
+        ttk.Checkbutton(self.advanced,text='Record RTTY preview audio for calibration',variable=self.vars['record_rtty']).grid(row=18,column=0,columnspan=2,sticky='w',pady=4)
         ham=ttk.Frame(self.advanced);ham.grid(row=16,column=0,columnspan=2,sticky='w',pady=6)
         ttk.Checkbutton(ham,text='Read-only Hamlib frequency check',variable=self.vars['hamlib_enabled']).pack(side='left')
         ttk.Label(ham,text='host').pack(side='left',padx=(12,4));ttk.Entry(ham,textvariable=self.vars['hamlib_host'],width=16).pack(side='left')
         ttk.Label(ham,text='port').pack(side='left',padx=(8,4));ttk.Entry(ham,textvariable=self.vars['hamlib_port'],width=6).pack(side='left')
-        ttk.Label(self.advanced,text='Coordinates stay local. USB audio uses the radio’s USB sound card — the yellow banner is the frequency to tune. Choose headphones/speakers before Hear audio. This app never transmits and never sends Hamlib PTT or tune commands. VARA, ALE and voice are not decoded. RTTY is a preview decoder.',wraplength=820).grid(row=17,column=0,columnspan=2,sticky='w',pady=8)
-        actions=ttk.Frame(self.advanced);actions.grid(row=18,column=0,columnspan=2,sticky='w')
+        ham.grid_configure(row=19)
+        ttk.Label(self.advanced,text='Coordinates stay local. USB audio uses the radio’s USB sound card — the yellow banner is the frequency to tune. Choose headphones/speakers before Hear audio. This app never transmits and never sends Hamlib PTT or tune commands. VARA, ALE and voice are not decoded. RTTY is a preview decoder.',wraplength=820).grid(row=20,column=0,columnspan=2,sticky='w',pady=8)
+        actions=ttk.Frame(self.advanced);actions.grid(row=21,column=0,columnspan=2,sticky='w')
         ttk.Button(actions,text='Save settings',command=self.save).pack(side='left',padx=(0,10))
         self.self_test_button=ttk.Button(actions,text='Test built-in decoder',command=self.self_test);self.self_test_button.pack(side='left')
+
+    def build_guide(self):
+        ttk.Label(self.guide,text='Live net-night checklist',font=('Segoe UI',14,'bold')).pack(anchor='w')
+        text=(
+            '1. Sync Windows time, then start listening at least five minutes before the published window.\n'
+            '2. Confirm the selected region, receiver name, yellow frequency banner, and that Audio says arriving.\n'
+            '3. For USB audio, tune the radio and click “I tuned the radio”; optional Hamlib readback shows the actual frequency.\n'
+            '4. Leave the app running through the full window. A tagged JS8 copy saves a short 12 kHz WAV when recording is enabled.\n'
+            '5. After the window, click Net report and export the GhostNet CSV. Keep report.json, session.log, and any WAV together.\n\n'
+            'RTTY preview calibration\n'
+            'Start with 2210 Hz center and normal polarity on 7.077 MHz USB. If a known transmission is unreadable, preserve the audio, then try Reverse. Adjust center only when a waterfall shows the pair centered elsewhere; the tones remain 170 Hz apart. Record the receiver, center, polarity, and a reference transcript. Do not treat synthetic tests as on-air validation.'
+        )
+        box=tk.Text(self.guide,bg='#101922',fg='#d5e3ec',wrap='word',font=('Segoe UI',11),height=18)
+        box.insert('1.0',text);box.configure(state='disabled');box.pack(fill='both',expand=True,pady=10)
+        actions=ttk.Frame(self.guide);actions.pack(fill='x')
+        ttk.Button(actions,text='Open net-night folder',command=self.open_net_folder).pack(side='left')
+        ttk.Button(actions,text='Create current report',command=self.write_report).pack(side='left',padx=8)
+        ttk.Button(actions,text='Export GhostNet CSV',command=self.export_ghostnet).pack(side='left')
+
+    def open_net_folder(self):
+        folder=self.data_dir/'net-night';folder.mkdir(parents=True,exist_ok=True)
+        try:os.startfile(folder)
+        except Exception as exc:messagebox.showerror('Net-night folder',str(exc))
 
     def refresh_audio_devices(self):
         try:
@@ -302,6 +334,7 @@ class App(tk.Tk):
             if config['js8_speeds'] not in SPEED_CHOICES:raise ValueError('Choose a JS8 speed preset.')
             if not -20<=float(config['gain'])<=100:raise ValueError('USB gain must be -20 to 100 dB.')
             if not 0<=float(config['monitor_volume'])<=1:raise ValueError('Hear-audio volume must be 0 through 1.')
+            if not 500<=float(config['rtty_center_hz'])<=3500:raise ValueError('RTTY audio center must be 500 through 3500 Hz.')
             if not 1<=int(config['hamlib_port'])<=65535:raise ValueError('Hamlib port must be 1–65535.')
             path=self.data_dir/'settings.tmp';path.write_text(json.dumps(config,indent=2),encoding='utf-8');path.replace(self.data_dir/'settings.json')
             return config
@@ -324,6 +357,7 @@ class App(tk.Tk):
         if config['js8_speeds'] not in SPEED_CHOICES:
             messagebox.showerror('Settings','Choose a JS8 speed preset.');return
         self.starting=True
+        self.cat_status.set('Radio readback: waiting' if config.get('hamlib_enabled') else ('Radio frequency: waiting for your confirmation' if kind=='audio' else 'Receiver frequency: controlled by the receive source'))
         self.start_button.configure(state='disabled');self.stop_button.configure(state='normal');self.hear_button.configure(state='disabled' if config.get('multi_region') else 'normal');self.tuned_button.configure(state='normal' if kind=='audio' else 'disabled');self.region.configure(state='disabled')
         self.connect(config)
 
@@ -362,7 +396,7 @@ class App(tk.Tk):
         try:
             if on and not messagebox.askokcancel('Hear audio',f'This will play receive audio through:\n\n{speaker}\n\nUse headphones and confirm this is not a radio/virtual-cable input. Continue?'):
                 return
-            self.session.set_monitor(on, speaker, self.vars['monitor_volume'].get())
+            self.session.set_monitor(on, speaker, self.vars['monitor_volume'].get(),self.vars['monitor_agc'].get())
         except Exception as exc:
             messagebox.showerror('Hear audio',str(exc));return
         self.hear_button.configure(text='Mute speaker' if on else 'Hear audio')
@@ -511,9 +545,7 @@ class App(tk.Tk):
                 if region:self.lane_status[region].set(str(value))
                 else:self.banner.set(value)
             elif kind=='cat':
-                extra=str(value)
-                base=self.banner.get().split(' · radio')[0]
-                self.banner.set(base+' · '+extra)
+                self.cat_status.set(str(value))
             elif kind=='monitor':
                 self.hear_button.configure(text='Mute speaker' if value else 'Hear audio')
             elif kind=='station':
@@ -543,11 +575,12 @@ class App(tk.Tk):
                     from local_update import launch_installer
                     launch_installer(self.update_installer)
                 except Exception as exc:
-                    self.closing=False;self.update_installer=None;messagebox.showerror('Update',str(exc));self.after(200,self.poll);return
+                    self.closing=False;self.update_installer=None;messagebox.showerror('Update',str(exc));return False
             self.journal.close();self.destroy();return True
         return False
 
     def destroy(self):
+        self._destroyed=True
         if getattr(self,'_poll_id',None):
             try:self.after_cancel(self._poll_id)
             except Exception:pass

@@ -14,9 +14,16 @@ Current release: **0.4.0** (unsigned Windows Setup).
 - Defaults the inbox to `@GHOSTNET`, `@GSTFLASH`, and `@GN…` tagged traffic. Incomplete multi-frame messages stay marked incomplete.
 - Follows the rest of the published hour honestly: VARA and ALE are **not** decoded (the app stays on 40 m JS8); RTTY 45.45 on 7.077 MHz is an **opt-in preview**; voice is a **7.190 MHz LSB tune reminder** only.
 - Optional **Hear audio** plays the receive stream on headphones/speakers you choose. That is monitor audio, not PTT.
+- Hear Audio has independent volume and optional gentle automatic level control. It never changes decoder audio.
 - Optional USB audio from a transceiver (you tune the radio). Optional SoapySDR USB dongle if you already have PothosSDR installed (not bundled).
 - Optional Hamlib is **GET frequency only** (`f`). No tune, no PTT.
 - Local SQLite journal under `%LOCALAPPDATA%\GhostNetReceiver\data`. Stop listening writes `data\net-night\report.json`.
+- A **Net-night guide** walks through time sync, tuning/readback, logging, reporting, and RTTY preview calibration.
+- When RTTY preview and calibration recording are enabled, the received 12 kHz audio is kept in the local net-night folder for later on-air validation.
+
+## Source improvements after 0.4.0
+
+The main branch adds a dedicated radio readback line, monitor-only automatic level control, an adjustable RTTY tone center (170 Hz shift), a net-night checklist, and stronger GUI close tests. These changes are not part of the published 0.4.0 release yet.
 
 ## Install (Windows)
 

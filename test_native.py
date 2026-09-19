@@ -342,7 +342,98 @@ with tempfile.TemporaryDirectory() as folder:
         self._run_gui("assert hasattr(ui,'build_preferences'); assert ui.preferences.winfo_exists(); ui.update_countdown(); assert ui.countdown.get(); assert len(ui.region_trees)==3")
 
     def test_inbox_defaults_to_tagged_and_has_banner(self):
-        self._run_gui("assert ui.tagged.get(); assert ui.vars['alerts'].get(); assert ui.vars['flash_override'].get(); assert ui.banner.get(); ui.draw_meter(0.4)")
+        self._run_gui("assert ui.tagged.get(); assert ui.vars['alerts'].get(); assert ui.vars['flash_override'].get(); assert ui.vars['monitor_agc'].get(); assert ui.banner.get(); assert ui.cat_status.get(); assert ui.guide.winfo_exists(); ui.draw_meter(0.4)")
+
+    def test_normal_close_cancels_owned_after_timer(self):
+        code = """import tempfile
+from app import App
+with tempfile.TemporaryDirectory() as folder:
+    ui=App(folder); ui.update(); ui.close()
+    import time
+    for _ in range(20):
+        if getattr(ui,'_destroyed',False): break
+        ui.update(); time.sleep(.03)
+    assert ui._destroyed
+"""
+        result=subprocess.run([sys.executable,'-c',code],cwd=ROOT,text=True,capture_output=True,timeout=30)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+
+
+class BugRegressionTests(unittest.TestCase):
+    def test_voice_cat_uses_requested_lsb_without_claiming_mode_readback(self):
+        from unittest.mock import patch
+        session=NativeSession.__new__(NativeSession)
+        session.latest_plan={'usb_hz':7190000,'sideband':'LSB'}
+        session.hz=7107000;session.config={};session.updates=queue.Queue()
+        session.report=lambda text: None
+        with patch('hamlib_watch.compare',return_value={'actual':7190000,'expected':7190000,'ok':True}):
+            session._hamlib_check()
+        text=session.updates.get()[1]
+        self.assertIn('LSB',text)
+        self.assertIn('mode not verified',text)
+        self.assertNotIn('USB',text)
+
+    def test_failed_update_schedules_only_one_poll(self):
+        code = """import tempfile
+from unittest.mock import patch
+from app import App
+with tempfile.TemporaryDirectory() as folder:
+    ui=App(folder)
+    try:
+        ui.after_cancel(ui._poll_id);ui._poll_id=None
+        ui.closing=True;ui.update_installer={'path':'test.exe'}
+        with patch('local_update.launch_installer',side_effect=RuntimeError('test failure')), patch('app.messagebox.showerror'), patch.object(ui,'after',return_value='test-timer') as timer:
+            ui.poll()
+            assert timer.call_count==1, timer.call_count
+            assert not ui.closing
+            assert ui.update_installer is None
+        ui._poll_id=None
+    finally:
+        ui.journal.close();ui.destroy()
+"""
+        result=subprocess.run([sys.executable,'-c',code],cwd=ROOT,text=True,capture_output=True,timeout=30)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+
+    def test_rtty_recordings_split_on_gaps_and_window_changes(self):
+        from unittest.mock import Mock
+        for boundary in ('gap','window'):
+            with self.subTest(boundary=boundary), tempfile.TemporaryDirectory() as folder:
+                journal=Journal(Path(folder)/'messages.sqlite3')
+                session=NativeSession({'source':SOURCE_AUDIO,'region':REGIONS[0],'record_rtty':True},journal,folder,queue.Queue())
+                calls=[0]
+                def desired():
+                    calls[0]+=1
+                    mode='JS8' if boundary=='window' and calls[0]==3 else 'RTTY'
+                    session.latest_plan={'banner':'test','decode':mode}
+                    return (7107000 if mode=='JS8' else 7077000),mode,'test'
+                session.desired=desired
+                class Receiver:
+                    error=''
+                    last_audio=time.monotonic()
+                    def __init__(self,*args):pass
+                    def start(self,hz):pass
+                    def tune(self,hz):pass
+                    def stop(self):pass
+                session.audio_receiver_factory=Receiver
+                count=[0]
+                def get_audio(timeout=None):
+                    count[0]+=1
+                    if count[0]>=3:session.stop_event.set()
+                    seq=count[0]*2 if boundary=='gap' else count[0]
+                    return np.zeros(1200,dtype=np.int16),12000,1700000000+count[0]/10,seq,session.generation
+                session.audio.get=get_audio
+                session._new_rtty=lambda: Mock(feed=lambda samples: [])
+                try:
+                    session._receive(Mock(),None)
+                    files=list((Path(folder)/'net-night').glob('rtty-*.wav'))
+                    self.assertEqual(len(files),3 if boundary=='gap' else 2)
+                    for path in files:
+                        with wave.open(str(path)) as wav:
+                            self.assertEqual(wav.getnframes(),1200)
+                            self.assertEqual(wav.getframerate(),12000)
+                finally:
+                    session._log.removeHandler(session._log_handler)
+                    session._log_handler.close();journal.close()
 
 
 class MonitorTests(unittest.TestCase):
@@ -357,6 +448,16 @@ class MonitorTests(unittest.TestCase):
         monitor.push(np.ones(1200, dtype=np.int16))
         self.assertFalse(monitor.queue.empty())
         monitor.set_enabled(False)
+
+    def test_monitor_agc_is_bounded_and_monitor_only(self):
+        from monitor import monitor_samples
+        quiet=np.ones(1200,dtype=np.int16)*100
+        output,gain=monitor_samples(quiet,volume=.5,agc=True,gain=1.0)
+        self.assertEqual(output.shape,(4800,1))
+        self.assertGreater(gain,1.0)
+        loud=np.ones(1200,dtype=np.int16)*32767
+        output,gain=monitor_samples(loud,volume=1.0,agc=True,gain=gain)
+        self.assertLessEqual(float(np.max(np.abs(output))),1.0)
 
 
 class ReviewFixTests(unittest.TestCase):
@@ -424,6 +525,11 @@ class ProductTests(unittest.TestCase):
         for offset in range(0,len(audio),511):
             lines.extend(decoder.feed(audio[offset:offset+511]))
         self.assertIn('GHOST123',''.join(lines).replace(' ',''))
+
+    def test_rtty_center_is_configurable_and_validated(self):
+        from rtty import RttyDecoder
+        self.assertEqual(RttyDecoder(center_hz=1800).center_hz,1800)
+        with self.assertRaises(ValueError):RttyDecoder(center_hz=100)
 
     def test_regional_fleet_builds_three_receive_lanes(self):
         from fleet import ReceiverFleet

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Fixed CAT sideband display, duplicate polling after an installer launch failure, and RTTY recordings spanning audio gaps or separate windows.
+
+- Added a net-night guide with direct report/export/archive actions.
+- Added a dedicated read-only radio-frequency status line instead of appending CAT state to the tune banner.
+- Added monitor-only automatic level control; the decoder continues to receive the untouched 12 kHz stream.
+- Added an adjustable RTTY audio center and optional raw calibration WAV while retaining the published 170 Hz shift and preview status.
+- Added isolated normal-close coverage for Tk's owned polling timer.
+
 ## 0.4.0
 
 - Added concurrent North America, Europe, and Australia/Pacific KiwiSDR lanes with separate live tabs and a combined searchable archive.
