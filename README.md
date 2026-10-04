@@ -4,7 +4,7 @@
 
 This independent desktop app selects a public KiwiSDR (or your radio’s USB audio), follows the [GhostNet v1.5](https://github.com/s2underground/GhostNet) regional schedule, decodes JS8 **in process**, and stores messages only on this computer. It does **not** transmit, does **not** require JS8Call, and is **not** affiliated with GhostNet or JS8Call.
 
-Current release: **0.4.0** (unsigned Windows Setup).
+Current release: **0.4.2** (unsigned Windows Setup).
 
 ## What it does
 
@@ -21,13 +21,9 @@ Current release: **0.4.0** (unsigned Windows Setup).
 - A **Net-night guide** walks through time sync, tuning/readback, logging, reporting, and RTTY preview calibration.
 - When RTTY preview and calibration recording are enabled, the received 12 kHz audio is kept in the local net-night folder for later on-air validation.
 
-## Source improvements after 0.4.0
-
-The main branch adds a dedicated radio readback line, monitor-only automatic level control, an adjustable RTTY tone center (170 Hz shift), a net-night checklist, and stronger GUI close tests. These changes are not part of the published 0.4.0 release yet.
-
 ## Install (Windows)
 
-1. Download **GhostNetReceiver-0.4.0-Setup.exe** from [Releases](../../releases).
+1. Download **GhostNetReceiver-0.4.2-Setup.exe** from [Releases](../../releases).
 2. Compare SHA-256 with `SHA256SUMS.txt` on the same release.
 3. The installer is **not Authenticode-signed**. SmartScreen: **More info → Run anyway**.
 4. It installs to `%LOCALAPPDATA%\Programs\GhostNetReceiver` (no administrator required).

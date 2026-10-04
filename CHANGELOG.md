@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.2
+
+- Fix split JS8 callsign/destination/body assembly so message bodies inherit GhostNet tags. Missing callsign headers remain incomplete; ambiguous overlapping traffic stays separate.
+- Display traffic oldest-to-newest, preserve the selected message as it grows, enlarge the reading pane, and make raw frames optional.
+- Include the previous locally developed 0.4.1 regional audio, receiver cache, decoder locking, and display updates.
+- Receive-only unsigned Windows Setup and portable package. Existing journal entries are preserved; these assembly fixes apply to new reception.
+
+## 0.4.1
+
+- Local development build: unsigned Setup includes net-night guide, CAT line, RTTY calibration, and per-lane Hear audio.
+- All-region monitoring now saves tagged JS8 WAVs. Hear one region at a time from Regional feeds.
+- Shared Kiwi directory cache so three lanes do not fetch the listing three times.
+- Decode stays process-safe across lanes (DLL static decoder). Hunt uses Normal-only until locked to cut CPU.
+- Start reminds you to sync Windows time before 0100z.
+- Watch-floor GUI: phosphor green / amber on black, UTC clock, RECEIVE ONLY masthead.
+
 ## Unreleased
 
 - Fixed CAT sideband display, duplicate polling after an installer launch failure, and RTTY recordings spanning audio gaps or separate windows.
@@ -26,3 +42,8 @@
 ## 0.3.2
 
 - Initial integrated GUI, KiwiSDR and USB-audio receive paths, scheduler, journal, reports, alerts, and unsigned installer work.
+
+## Local reception fixes
+
+- Join compound callsign and directed destination headers before assembling JS8 body frames. Linked raw frames inherit the conversation tag; ambiguous or missing headers stay separate.
+- Read inbox and regional feeds oldest-to-newest, preserve the selected message during live updates, enlarge the message pane, and hide individual frames until requested.

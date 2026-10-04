@@ -2,9 +2,14 @@
 import json
 import math
 import re
+import threading
+import time
 import urllib.request
 from urllib.parse import urlparse
 from core import REGIONS, region_for_location
+
+_DIRECTORY_LOCK=threading.Lock()
+_DIRECTORY_CACHE={'at':0.0,'rows':None}
 
 DIRECTORY_URL='http://rx.linkfanel.net/kiwisdr_com.js'
 
@@ -66,13 +71,23 @@ def rank_stations(rows,region,location=None,hz=7107000):
             continue
     return sorted(ranked,key=lambda r:r['score'])[:30]
 
+def load_directory(ttl=120):
+    with _DIRECTORY_LOCK:
+        now=time.monotonic()
+        if _DIRECTORY_CACHE['rows'] is not None and now-_DIRECTORY_CACHE['at']<ttl:
+            return _DIRECTORY_CACHE['rows']
+        request=urllib.request.Request(DIRECTORY_URL,headers={'User-Agent':'GhostNetReceiver/0.4.2'})
+        with urllib.request.urlopen(request,timeout=15) as response:
+            payload=response.read(5_000_001)
+        if len(payload)>5_000_000:
+            raise ValueError('Directory exceeded size limit')
+        rows=parse_directory(payload.decode('utf-8'))
+        _DIRECTORY_CACHE['rows']=rows
+        _DIRECTORY_CACHE['at']=now
+        return rows
+
 def discover(region,location=None,hz=7107000):
-    request=urllib.request.Request(DIRECTORY_URL,headers={'User-Agent':'GhostNetReceiver/0.4.0'})
-    with urllib.request.urlopen(request,timeout=15) as response:
-        payload=response.read(5_000_001)
-    if len(payload)>5_000_000:
-        raise ValueError('Directory exceeded size limit')
-    stations=rank_stations(parse_directory(payload.decode('utf-8')),region,location,hz)
+    stations=rank_stations(load_directory(),region,location,hz)
     if not stations:
         raise ValueError('No available regional receivers in the directory snapshot. Try later or enter a URL.')
     return stations

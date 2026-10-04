@@ -41,8 +41,12 @@ class Conversations:
     def update(self,cid,frame_id,text,state,destination=''):
         with self.journal.lock,self.journal.db:
             self.journal.db.execute('INSERT OR IGNORE INTO conversation_frames VALUES (?,?)',(cid,frame_id))
+            classification=classify(text,destination)
             self.journal.db.execute('UPDATE conversations SET last_id=?,text=?,state=?,classification=? WHERE id=?',
-                (frame_id,text,state,classify(text,destination),cid))
+                (frame_id,text,state,classification,cid))
+            # Only frames proven to belong to this conversation inherit its tag.
+            self.journal.db.execute('UPDATE messages SET classification=? WHERE id IN (SELECT frame_id FROM conversation_frames WHERE conversation_id=?)',
+                (classification,cid))
 
     def rows(self,query='',tagged=False):
         sql='''SELECT m.*,c.id AS conversation_id,c.text AS conversation_text,c.state,c.classification AS conversation_classification
@@ -75,10 +79,30 @@ class Assembler:
         sender=directed[0] if directed else frame.get('compound','')
         dest=directed[1] if len(directed)>1 else ''
         command=directed[2] if len(directed)>2 else ''
+        if sender in ('<....>', '<...>', '...'):sender=''
         first=bool(frame['bits']&1);last=bool(frame['bits']&2)
         candidates=[p for p in self.pending.values() if p['source']==source and p['hz']==hz and p['mode']==mode
             and abs(p['offset']-frame['offset'])<=8 and period*.5<=epoch-p['last']<=period*1.5
             and (not sender or sender==p['sender'])]
+        # Compound callsign followed by compound directed destination (type 2).
+        # This is a header extension, not message data for checksum validation.
+        header_candidates=[p for p in self.pending.values() if p.get('compound_header')
+            and p['source']==source and p['hz']==hz and p['mode']==mode
+            and abs(p['offset']-frame['offset'])<=8 and 0<=epoch-p['last']<=period*1.5
+            and (not sender or sender==p['sender'])]
+        if not first and frame['frame_type']==2 and dest and len(header_candidates)==1:
+            p=header_candidates[0]
+            p['dest']=dest;p['command']=command;p['last']=epoch
+            p['header']+=frame['text'];p['text']=p['header'];p['body']=''
+            p['compound_header']=False;p['low']=p['low'] or frame['low_confidence']
+            state='Complete frame' if last else 'Incomplete'
+            if p['low']:state='Low confidence · '+state
+            self.store.update(p['cid'],raw_id,p['text'],state,dest)
+            if last:
+                self.pending.pop(p['cid'],None)
+                if state=='Complete frame':
+                    return {'id':p['cid'],'text':p['text'],'classification':classify(p['text'],dest)}
+            return None
         # A new header never becomes data belonging to an earlier sender.
         continuation=not first and frame['frame_type'] in (4,6) and len(candidates)==1
         if continuation:
@@ -89,6 +113,7 @@ class Assembler:
                 result=self.validate(p['command'],p['body'])
                 state='Checksum failed' if not result['valid'] else ('Checksum verified' if result['checksum_bits'] else 'Complete · no message checksum')
                 if result['valid']:p['text']=p['header']+result['text']
+                if p.get('missing_header'):state='Incomplete · missing callsign header'
                 if p['low']:state='Low confidence · '+state
                 self.pending.pop(p['cid'],None)
             self.store.update(p['cid'],raw_id,p['text'],state,p['dest'])
@@ -98,9 +123,10 @@ class Assembler:
         state=('Complete frame' if first and last else 'Incomplete')
         if frame['low_confidence']:state='Low confidence · '+state
         cid=self.store.create(raw_id,frame['text'],state,dest)
-        if first and not last:
+        if not last and (first or (frame['frame_type']==2 and dest)):
             self.pending[cid]={'cid':cid,'mode':mode,'source':source,'hz':hz,'offset':frame['offset'],
                 'sender':sender,'dest':dest,'command':command,'last':epoch,'text':frame['text'],
-                'header':frame['text'] if directed else '', 'body':'' if directed else frame['text'],'low':frame['low_confidence']}
+                'missing_header':not first,'compound_header':frame['frame_type']==1,
+                'header':frame['text'] if directed or frame['frame_type']==1 else '', 'body':'' if directed or frame['frame_type']==1 else frame['text'],'low':frame['low_confidence']}
         if state=='Complete frame':return {'id':cid,'text':frame['text'],'classification':classify(frame['text'],dest)}
         return None

@@ -1,5 +1,5 @@
 #define MyAppName "GhostNet Receiver"
-#define MyAppVersion "0.4.0"
+#define MyAppVersion "0.4.2"
 #define MyAppExeName "GhostNetReceiver.exe"
 
 [Setup]
@@ -9,7 +9,7 @@ AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppName}
 AppCopyright=GPL-3.0-or-later
-VersionInfoVersion=0.4.0.0
+VersionInfoVersion=0.4.2.0
 VersionInfoProductName={#MyAppName}
 VersionInfoProductVersion={#MyAppVersion}
 VersionInfoDescription=GhostNet Receiver Setup
@@ -27,7 +27,7 @@ WizardStyle=modern
 UninstallDisplayIcon={app}\{#MyAppExeName}
 SetupIconFile=ghostnet.ico
 OutputDir=release
-OutputBaseFilename=GhostNetReceiver-0.4.0-Setup
+OutputBaseFilename=GhostNetReceiver-0.4.2-Setup
 SetupLogging=yes
 CloseApplications=yes
 RestartApplications=no

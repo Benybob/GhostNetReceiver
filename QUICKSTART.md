@@ -1,4 +1,4 @@
-# GhostNet Receiver 0.3.2
+# GhostNet Receiver 0.4.2
 
 1. Run **GhostNetReceiver-0.3.2-Setup.exe** or **Start.cmd**.
 2. If SmartScreen appears: More info → Run anyway. Compare SHA-256 to `SHA256SUMS.txt`.

@@ -9,8 +9,8 @@ ROOT = Path(__file__).resolve().parent
 DIST = ROOT / 'dist' / 'GhostNetReceiver'
 INSTALLER_DIR = ROOT / 'release'
 ISCC = ROOT / 'work' / 'tools' / 'inno' / 'ISCC.exe'
-SETUP = INSTALLER_DIR / 'GhostNetReceiver-0.4.0-Setup.exe'
-PORTABLE = INSTALLER_DIR / 'GhostNetReceiver-0.4.0-Portable.zip'
+SETUP = INSTALLER_DIR / 'GhostNetReceiver-0.4.2-Setup.exe'
+PORTABLE = INSTALLER_DIR / 'GhostNetReceiver-0.4.2-Portable.zip'
 
 
 def main():

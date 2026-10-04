@@ -1,3 +1,13 @@
+# Validation — 0.4.2
+
+Source suite: 53 tests, including split compound headers, inherited body tags, incomplete missing headers, ambiguous overlaps, chronological GUI order and selection, recorded JS8, and update/audio lifecycle regressions.
+
+Packaged decoder and isolated installer validation are recorded with the release notes. No new live RF or on-air RTTY validation is claimed. Existing messages are retained; old conversations are not automatically reassembled.
+
+# Validation — 0.4.1
+
+Tonight's unsigned installer. Per-lane Hear audio, fleet net-night WAV capture, shared Kiwi directory cache, process-wide decode lock, Normal-only hunt until locked.
+
 # Validation — 0.4.0
 
 The 0.3.2 hostile review findings are addressed in this tree; see `REVIEW_FIXES.md` for the mapping.

@@ -33,13 +33,14 @@ class ReceiverFleet:
         self.data_dir = data_dir
         self.updates = updates
         self.sessions = {}
+        self.listening_region = None
         for region in REGIONS:
             lane = deepcopy(config)
             lane['region'] = region
             lane['kiwi_url'] = ''
             lane['automatic_receiver'] = True
             lane['lane_name'] = region
-            lane['record_net'] = False
+            lane['record_net'] = True
             self.sessions[region] = session_factory(
                 lane, journal, data_dir, _LaneUpdates(updates, region))
         self.thread = _FleetThread(self)
@@ -65,6 +66,15 @@ class ReceiverFleet:
     def start(self):
         for session in self.sessions.values():
             session.start()
+
+    def set_monitor(self, on, device_name='', volume=0.3, agc=False, region=None):
+        for session in self.sessions.values():
+            session.set_monitor(False)
+        if on:
+            if not region or region not in self.sessions:
+                raise ValueError('Choose one regional feed to hear.')
+            self.sessions[region].set_monitor(True, device_name, volume, agc)
+        self.listening_region = region if on else None
 
     def stop(self):
         for session in self.sessions.values():

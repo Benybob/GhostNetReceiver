@@ -32,7 +32,7 @@ class App(tk.Tk):
         self.title('GhostNet Receiver '+VERSION)
         self.geometry('1100x760')
         self.minsize(850,600)
-        self.configure(bg='#101922')
+        self.configure(bg='#050807')
         icon=ROOT/'ghostnet.ico'
         if icon.is_file():
             try:self.iconbitmap(icon)
@@ -66,57 +66,70 @@ class App(tk.Tk):
         self.starting=False
         self.self_testing=False
         self.discovery_generation=0
-        self.status=tk.StringVar(value='Ready to listen')
+        self.status=tk.StringVar(value='STANDBY · RECEIVE ONLY')
+        self.utc_clock=tk.StringVar(value='')
         self.station=tk.StringVar(value='An online receiver is selected automatically. No radio hardware needed.')
         self.summary=tk.StringVar(value='Your messages stay on this computer.')
         self.banner=tk.StringVar(value='Start listening to follow the published GhostNet hour.')
         self.cat_status=tk.StringVar(value='Radio readback: not enabled')
         self.search=tk.StringVar()
         self.tagged=tk.BooleanVar(value=True)
+        self.show_raw=tk.BooleanVar(value=False)
         self.items={}
         self.lane_status={region:tk.StringVar(value='Stopped') for region in REGIONS}
         style=ttk.Style(self)
         style.theme_use('clam')
-        style.configure('.',background='#172532',foreground='#e5edf4',font=('Segoe UI',10))
-        style.configure('TFrame',background='#172532')
-        style.configure('TLabel',padding=4)
-        style.configure('TButton',padding=(15,9),background='#284457')
-        style.configure('Start.TButton',background='#207766',font=('Segoe UI',11,'bold'))
-        style.configure('TNotebook.Tab',padding=(18,9))
-        style.configure('TEntry',fieldbackground='#eef4f7',foreground='#172532')
-        style.map('TCombobox',fieldbackground=[('readonly','#eef4f7')],foreground=[('readonly','#172532')])
-        style.configure('Treeview',background='#101922',fieldbackground='#101922',foreground='#e5edf4',rowheight=34)
-        style.configure('Treeview.Heading',background='#284457',font=('Segoe UI',10,'bold'))
-        top=ttk.Frame(self,padding=18);top.pack(fill='x',padx=15,pady=(15,0))
-        ttk.Label(top,text='GhostNet Receiver',font=('Segoe UI',24,'bold')).pack(anchor='w')
-        ttk.Label(top,text='Listen. Read. Keep a local record.',foreground='#a9bdca').pack(anchor='w')
-        row=ttk.Frame(top);row.pack(fill='x',pady=(12,5))
-        ttk.Label(row,text='Your region').pack(side='left')
+        bg='#0b100e';fg='#c8e6c0';ph='#7CFF6B';amber='#FFB000';panel='#121a16'
+        style.configure('.',background=bg,foreground=fg,font=('Consolas',10))
+        style.configure('TFrame',background=bg)
+        style.configure('TLabel',padding=3,background=bg,foreground=fg)
+        style.configure('TButton',padding=(12,8),background='#1a2a22',foreground=ph,bordercolor=ph)
+        style.map('TButton',background=[('active','#24382c'),('disabled','#101614')],foreground=[('disabled','#4a6a52')])
+        style.configure('Start.TButton',background='#14331c',foreground=ph,font=('Consolas',11,'bold'))
+        style.configure('Stop.TButton',background='#2a1414',foreground='#ff8a7a')
+        style.configure('TNotebook',background=bg,borderwidth=0)
+        style.configure('TNotebook.Tab',padding=(14,8),background='#121a16',foreground='#8fb896',font=('Consolas',9,'bold'))
+        style.map('TNotebook.Tab',background=[('selected','#1a2f22')],foreground=[('selected',ph)])
+        style.configure('TEntry',fieldbackground='#050807',foreground=ph,insertcolor=ph)
+        style.configure('TCombobox',fieldbackground='#050807',foreground=ph,background='#121a16')
+        style.map('TCombobox',fieldbackground=[('readonly','#050807')],foreground=[('readonly',ph)])
+        style.configure('TCheckbutton',background=bg,foreground=fg)
+        style.configure('Treeview',background='#050807',fieldbackground='#050807',foreground=ph,rowheight=32,font=('Consolas',10))
+        style.configure('Treeview.Heading',background='#14331c',foreground=amber,font=('Consolas',9,'bold'))
+        style.map('Treeview',background=[('selected','#1e3d28')],foreground=[('selected',amber)])
+        top=ttk.Frame(self,padding=14);top.pack(fill='x',padx=12,pady=(10,0))
+        mast=ttk.Frame(top);mast.pack(fill='x')
+        ttk.Label(mast,text='GHOSTNET RECEIVER',font=('Consolas',22,'bold'),foreground=ph).pack(side='left')
+        ttk.Label(mast,text='  //  RECEIVE ONLY',font=('Consolas',12,'bold'),foreground=amber).pack(side='left',pady=(8,0))
+        ttk.Label(mast,textvariable=self.utc_clock,font=('Consolas',14,'bold'),foreground=ph).pack(side='right')
+        ttk.Label(top,text='INDEPENDENT LISTENER  ·  NOT AFFILIATED WITH GHOSTNET OR JS8CALL',foreground='#6a8f72',font=('Consolas',8)).pack(anchor='w')
+        row=ttk.Frame(top);row.pack(fill='x',pady=(10,4))
+        ttk.Label(row,text='REGION',foreground=amber,font=('Consolas',9,'bold')).pack(side='left')
         self.region=ttk.Combobox(row,textvariable=self.vars['region'],values=REGIONS,state='readonly',width=24)
         self.region.pack(side='left',padx=10)
-        self.start_button=ttk.Button(row,text='Start listening',style='Start.TButton',command=self.start)
+        self.start_button=ttk.Button(row,text='START LISTENING',style='Start.TButton',command=self.start)
         self.start_button.pack(side='left',padx=8)
-        self.stop_button=ttk.Button(row,text='Stop',command=self.stop,state='disabled')
+        self.stop_button=ttk.Button(row,text='STOP',style='Stop.TButton',command=self.stop,state='disabled')
         self.stop_button.pack(side='left')
-        self.hear_button=ttk.Button(row,text='Hear audio',command=self.toggle_hear,state='disabled')
+        self.hear_button=ttk.Button(row,text='HEAR AUDIO',command=self.toggle_hear,state='disabled')
         self.hear_button.pack(side='left',padx=8)
-        self.tuned_button=ttk.Button(row,text='I tuned the radio',command=self.confirm_tuned,state='disabled')
+        self.tuned_button=ttk.Button(row,text='RADIO TUNED',command=self.confirm_tuned,state='disabled')
         self.tuned_button.pack(side='left')
-        ttk.Label(top,textvariable=self.status,font=('Segoe UI',12,'bold'),wraplength=960).pack(anchor='w',pady=(10,0))
-        ttk.Label(top,textvariable=self.banner,font=('Segoe UI',16,'bold'),foreground='#f3d48b',wraplength=1000).pack(anchor='w',pady=(6,0))
-        ttk.Label(top,textvariable=self.cat_status,foreground='#8fc5dc',wraplength=960).pack(anchor='w')
-        ttk.Label(top,textvariable=self.station,foreground='#a9bdca',wraplength=960).pack(anchor='w')
+        ttk.Label(top,textvariable=self.status,font=('Consolas',12,'bold'),foreground=ph,wraplength=1000).pack(anchor='w',pady=(8,0))
+        ttk.Label(top,textvariable=self.banner,font=('Consolas',15,'bold'),foreground=amber,wraplength=1000).pack(anchor='w',pady=(4,0))
+        ttk.Label(top,textvariable=self.cat_status,foreground='#8fc5dc',font=('Consolas',9),wraplength=1000).pack(anchor='w')
+        ttk.Label(top,textvariable=self.station,foreground='#6a8f72',font=('Consolas',9),wraplength=1000).pack(anchor='w')
         meter=ttk.Frame(top);meter.pack(anchor='w',pady=(4,0))
-        ttk.Label(meter,text='Audio').pack(side='left')
-        self.meter=tk.Canvas(meter,width=160,height=12,bg='#101922',highlightthickness=0)
+        ttk.Label(meter,text='AUDIO',foreground=amber,font=('Consolas',8,'bold')).pack(side='left')
+        self.meter=tk.Canvas(meter,width=180,height=10,bg='#050807',highlightthickness=1,highlightbackground='#1e3d28')
         self.meter.pack(side='left',padx=8)
-        ttk.Label(top,textvariable=self.telemetry,foreground='#a9bdca').pack(anchor='w')
-        ttk.Label(top,textvariable=self.countdown,foreground='#b6d9c8',wraplength=960).pack(anchor='w')
-        self.tabs=ttk.Notebook(self);self.tabs.pack(fill='both',expand=True,padx=15,pady=15)
+        ttk.Label(top,textvariable=self.telemetry,foreground='#6a8f72',font=('Consolas',9)).pack(anchor='w')
+        ttk.Label(top,textvariable=self.countdown,foreground=ph,font=('Consolas',10),wraplength=1000).pack(anchor='w')
+        self.tabs=ttk.Notebook(self);self.tabs.pack(fill='both',expand=True,padx=12,pady=12)
         self.inbox=ttk.Frame(self.tabs,padding=12)
         self.schedule=ttk.Frame(self.tabs,padding=12)
         self.advanced_tab=ttk.Frame(self.tabs)
-        canvas=tk.Canvas(self.advanced_tab,bg='#172532',highlightthickness=0)
+        canvas=tk.Canvas(self.advanced_tab,bg='#0b100e',highlightthickness=0)
         scroll=ttk.Scrollbar(self.advanced_tab,orient='vertical',command=canvas.yview)
         scroll.pack(side='right',fill='y');canvas.pack(side='left',fill='both',expand=True)
         canvas.configure(yscrollcommand=scroll.set)
@@ -127,18 +140,19 @@ class App(tk.Tk):
         self.regional=ttk.Frame(self.tabs,padding=10)
         self.guide=ttk.Frame(self.tabs,padding=12)
         self.activity=ttk.Frame(self.tabs,padding=12)
-        for frame,title in [(self.inbox,'All messages'),(self.regional,'Regional feeds'),(self.schedule,'Next scheduled nets'),(self.guide,'Net-night guide'),(self.advanced_tab,'Advanced'),(self.activity,'Activity')]:self.tabs.add(frame,text=title)
+        for frame,title in [(self.inbox,'TRAFFIC'),(self.regional,'LANES'),(self.schedule,'SCHEDULE'),(self.guide,'NET NIGHT'),(self.advanced_tab,'ADVANCED'),(self.activity,'LOG')]:self.tabs.add(frame,text=title)
         self.build_inbox();self.build_advanced();self.build_guide()
         self.build_regional()
-        self.preferences=ttk.Frame(self.tabs,padding=15);self.tabs.insert(2,self.preferences,text='Alerts & updates')
+        self.preferences=ttk.Frame(self.tabs,padding=15);self.tabs.insert(2,self.preferences,text='ALERTS')
         self.build_preferences()
-        self.schedule_text=tk.Text(self.schedule,bg='#101922',fg='#d5e3ec',wrap='word',font=('Consolas',10),state='disabled')
+        self.schedule_text=tk.Text(self.schedule,bg='#050807',fg='#7CFF6B',wrap='word',font=('Consolas',10),state='disabled',insertbackground='#7CFF6B')
         self.schedule_text.pack(fill='both',expand=True)
-        self.events=tk.Text(self.activity,bg='#101922',fg='#d5e3ec',wrap='word',font=('Consolas',10),state='disabled')
+        self.events=tk.Text(self.activity,bg='#050807',fg='#7CFF6B',wrap='word',font=('Consolas',10),state='disabled',insertbackground='#7CFF6B')
         self.events.pack(fill='both',expand=True)
         self.refresh_schedule();self.refresh()
         self.region.bind('<<ComboboxSelected>>',lambda _:self.refresh_schedule())
         if self.settings_error:self.event('Settings could not be loaded: '+self.settings_error)
+        self.update_countdown()
         self.protocol('WM_DELETE_WINDOW',self.close)
         self._poll_id=self.after(200,self.poll)
 
@@ -157,11 +171,12 @@ class App(tk.Tk):
             self.tree.heading(key,text=title);self.tree.column(key,width=width,minwidth=70,stretch=key=='text')
         scrollbar=ttk.Scrollbar(body,orient='vertical',command=self.tree.yview);scrollbar.pack(side='right',fill='y')
         self.tree.configure(yscrollcommand=scrollbar.set);self.tree.pack(fill='both',expand=True)
-        self.tree.tag_configure('flash',foreground='#ffc47b')
-        self.tree.tag_configure('incomplete',foreground='#9cb4c4')
+        self.tree.tag_configure('flash',foreground='#FFB000')
+        self.tree.tag_configure('incomplete',foreground='#6a8f72')
         self.tree.bind('<<TreeviewSelect>>',self.details)
         ttk.Label(self.inbox,textvariable=self.summary).pack(anchor='w')
-        self.detail=tk.Text(self.inbox,height=4,bg='#101922',fg='#d5e3ec',wrap='word',font=('Segoe UI',10),state='disabled')
+        ttk.Checkbutton(self.inbox,text='Show individual decoded frames',variable=self.show_raw,command=self.details).pack(anchor='w')
+        self.detail=tk.Text(self.inbox,height=9,bg='#050807',fg='#7CFF6B',wrap='word',font=('Consolas',10),state='disabled')
         self.detail.pack(fill='x')
 
     def build_regional(self):
@@ -171,6 +186,7 @@ class App(tk.Tk):
         for region in REGIONS:
             frame=ttk.Frame(self.region_tabs,padding=8);self.region_tabs.add(frame,text=region)
             ttk.Label(frame,textvariable=self.lane_status[region],foreground='#f3d48b',wraplength=850).pack(anchor='w',pady=(0,6))
+            ttk.Button(frame,text='Hear this region',command=lambda r=region:self.hear_lane(r)).pack(anchor='w',pady=(0,6))
             tree=ttk.Treeview(frame,columns=('time','from','tag','text'),show='headings')
             for key,title,width in [('time','RECEIVED',140),('from','FROM',100),('tag','TRAFFIC',150),('text','MESSAGE',500)]:
                 tree.heading(key,text=title);tree.column(key,width=width,stretch=key=='text')
@@ -232,7 +248,7 @@ class App(tk.Tk):
             'RTTY preview calibration\n'
             'Start with 2210 Hz center and normal polarity on 7.077 MHz USB. If a known transmission is unreadable, preserve the audio, then try Reverse. Adjust center only when a waterfall shows the pair centered elsewhere; the tones remain 170 Hz apart. Record the receiver, center, polarity, and a reference transcript. Do not treat synthetic tests as on-air validation.'
         )
-        box=tk.Text(self.guide,bg='#101922',fg='#d5e3ec',wrap='word',font=('Segoe UI',11),height=18)
+        box=tk.Text(self.guide,bg='#050807',fg='#c8e6c0',wrap='word',font=('Consolas',10),height=18)
         box.insert('1.0',text);box.configure(state='disabled');box.pack(fill='both',expand=True,pady=10)
         actions=ttk.Frame(self.guide);actions.pack(fill='x')
         ttk.Button(actions,text='Open net-night folder',command=self.open_net_folder).pack(side='left')
@@ -255,7 +271,7 @@ class App(tk.Tk):
 
     def build_preferences(self):
         ttk.Button(self.preferences,text='Choose installer…',command=self.choose_update).pack(anchor='e',pady=(0,6))
-        canvas=tk.Canvas(self.preferences,bg='#172532',highlightthickness=0)
+        canvas=tk.Canvas(self.preferences,bg='#0b100e',highlightthickness=0)
         scroll=ttk.Scrollbar(self.preferences,orient='vertical',command=canvas.yview)
         scroll.pack(side='right',fill='y');canvas.pack(side='left',fill='both',expand=True)
         canvas.configure(yscrollcommand=scroll.set)
@@ -292,6 +308,7 @@ class App(tk.Tk):
 
     def update_countdown(self):
         now=datetime.now(UTC)
+        self.utc_clock.set(now.strftime('%Y-%m-%d  %H:%M:%S UTC'))
         if self.vars['tuning'].get()=='Hold 40m JS8':
             self.countdown.set('Holding 40m JS8 at 7.107 MHz. Scheduled retuning is off.')
             if not (self.session and self.session.thread.is_alive()):
@@ -358,12 +375,12 @@ class App(tk.Tk):
             messagebox.showerror('Settings','Choose a JS8 speed preset.');return
         self.starting=True
         self.cat_status.set('Radio readback: waiting' if config.get('hamlib_enabled') else ('Radio frequency: waiting for your confirmation' if kind=='audio' else 'Receiver frequency: controlled by the receive source'))
-        self.start_button.configure(state='disabled');self.stop_button.configure(state='normal');self.hear_button.configure(state='disabled' if config.get('multi_region') else 'normal');self.tuned_button.configure(state='normal' if kind=='audio' else 'disabled');self.region.configure(state='disabled')
+        self.start_button.configure(state='disabled');self.stop_button.configure(state='normal');self.hear_button.configure(state='normal');self.tuned_button.configure(state='normal' if kind=='audio' else 'disabled');self.region.configure(state='disabled')
         self.connect(config)
 
     def connect(self,config):
         self.starting=False
-        self.status.set('Connecting…')
+        self.status.set('ACQUIRING RECEIVER · RECEIVE ONLY')
         kind=source_kind(config)
         if kind=='kiwi':self.station.set(config['kiwi_url'] or 'Online receiver')
         elif kind=='audio':self.station.set(config.get('audio_device') or 'USB audio input — tune the radio to the scheduled frequency')
@@ -371,14 +388,15 @@ class App(tk.Tk):
         self.session=(ReceiverFleet(config,self.journal,self.data_dir,self.updates)
                       if config.get('multi_region') else NativeSession(config,self.journal,self.data_dir,self.updates))
         self.session.start()
+        self.event('Before a net: Settings → Time & language → Date & time → Sync now. Keep this window on through the JS8 slot, then Stop and open Net-night guide.')
 
     def stop(self):
         self.discovery_generation+=1;self.starting=False
         if self.session and self.session.thread.is_alive():self.session.stop();self.status.set('Stopping…')
-        else:self.reset_controls();self.status.set('Stopped. Messages are saved.')
+        else:self.reset_controls();self.status.set('STANDBY · TRAFFIC SAVED')
 
     def reset_controls(self):
-        self.start_button.configure(state='normal');self.stop_button.configure(state='disabled');self.hear_button.configure(state='disabled',text='Hear audio');self.tuned_button.configure(state='disabled');self.region.configure(state='readonly')
+        self.start_button.configure(state='normal');self.stop_button.configure(state='disabled');self.hear_button.configure(state='disabled',text='HEAR AUDIO');self.tuned_button.configure(state='disabled');self.region.configure(state='readonly')
 
     def confirm_tuned(self):
         if self.session and not isinstance(self.session,ReceiverFleet) and self.session.thread.is_alive():
@@ -388,21 +406,45 @@ class App(tk.Tk):
         if not self.session or not self.session.thread.is_alive():
             return
         if isinstance(self.session,ReceiverFleet):
-            messagebox.showinfo('Hear audio','Choose one regional receiver at a time to hear audio. Concurrent playback from three receivers is intentionally disabled.');return
+            try:
+                idx=self.region_tabs.index(self.region_tabs.select())
+                self.hear_lane(REGIONS[idx])
+            except Exception:
+                messagebox.showinfo('Hear audio','Open Regional feeds and click Hear this region for one lane.');return
+            return
         on=not self.session.monitor.enabled.is_set()
+        self._hear_session(self.session,on)
+
+    def hear_lane(self,region):
+        if not isinstance(self.session,ReceiverFleet) or not self.session.thread.is_alive():
+            messagebox.showinfo('Hear audio','Start listening with Monitor all regions enabled to hear a regional lane.');return
+        session=self.session.sessions[region]
+        already=session.monitor.enabled.is_set()
+        self._hear_session(self.session,not already,region=region)
+
+    def _hear_session(self,target,on,region=None):
         speaker=(self.vars.get('speaker_device').get() if 'speaker_device' in self.vars else '') or ''
         if on and not speaker.strip():
             messagebox.showerror('Hear audio','Choose headphones or speakers in Advanced first.');return
         try:
-            if on and not messagebox.askokcancel('Hear audio',f'This will play receive audio through:\n\n{speaker}\n\nUse headphones and confirm this is not a radio/virtual-cable input. Continue?'):
+            if on and not messagebox.askokcancel('Hear audio',f'This will play receive audio through:\n\n{speaker}\n\nOnly one region plays at a time. Use headphones. Continue?'):
                 return
-            self.session.set_monitor(on, speaker, self.vars['monitor_volume'].get(),self.vars['monitor_agc'].get())
+            if isinstance(target,ReceiverFleet):
+                target.set_monitor(on, speaker, self.vars['monitor_volume'].get(),self.vars['monitor_agc'].get(), region)
+            else:
+                target.set_monitor(on, speaker, self.vars['monitor_volume'].get(),self.vars['monitor_agc'].get())
         except Exception as exc:
             messagebox.showerror('Hear audio',str(exc));return
-        self.hear_button.configure(text='Mute speaker' if on else 'Hear audio')
+        playing=False
+        if isinstance(self.session,ReceiverFleet):
+            playing=any(s.monitor.enabled.is_set() for s in self.session.sessions.values())
+        else:
+            playing=self.session.monitor.enabled.is_set()
+        self.hear_button.configure(text='MUTE' if playing else 'HEAR AUDIO')
 
     def refresh(self):
-        rows=self.conversations.rows(self.search.get(),self.tagged.get())
+        selected=self.tree.selection()
+        rows=list(reversed(self.conversations.rows(self.search.get(),self.tagged.get())))
         self.tree.delete(*self.tree.get_children());self.items={str(r['id']):r for r in rows}
         for r in rows:
             clock=datetime.fromisoformat(r['received_utc']).astimezone().strftime('%b %d %H:%M:%S')
@@ -413,8 +455,12 @@ class App(tk.Tk):
             if incomplete:tags.append('incomplete')
             self.tree.insert('','end',iid=str(r['id']),values=(clock,r['sender'],r['classification'],prefix+r['text'].replace('\n',' ')),tags=tags)
         empty='No GhostNet-tagged messages yet. Uncheck “GhostNet tags only” to see other JS8.' if self.tagged.get() else 'No messages yet. This inbox fills when a JS8 or RTTY transmission is received.'
-        self.summary.set(f'{len(rows)} conversations shown · incomplete stays marked · saved automatically' if rows else empty)
-        all_rows=self.conversations.rows(self.search.get(),False)
+        self.summary.set(f'{len(rows)} conversations shown · oldest to newest · incomplete stays marked · saved automatically' if rows else empty)
+        if selected and selected[0] in self.items:
+            self.tree.selection_set(selected[0]);self.details()
+        elif rows:
+            self.tree.selection_set(str(rows[-1]['id']));self.tree.see(str(rows[-1]['id']));self.details()
+        all_rows=list(reversed(self.conversations.rows(self.search.get(),self.tagged.get())))
         for region,tree in getattr(self,'region_trees',{}).items():
             tree.delete(*tree.get_children())
             regional=[r for r in all_rows if r.get('source','').startswith(region+' | ')]
@@ -428,7 +474,7 @@ class App(tk.Tk):
             r=self.items[selected[0]]
             kind=r['state']
             frames=self.conversations.frames(r['id'])
-            raw='\n'.join(f"Frame {f['id']}: {f['text']}" for f in frames)
+            raw='\n'.join(f"Frame {f['id']}: {f['text']}" for f in frames) if self.show_raw.get() else ''
             self.set_text(self.detail,f"{r['text']}\n{kind} · {r['frequency']/1e6:.6f} MHz · SNR {r['snr']} · {r['source']}\n{raw}")
 
     def refresh_schedule(self):
@@ -474,10 +520,10 @@ class App(tk.Tk):
 
     def draw_meter(self,level=0):
         self.meter.delete('all')
-        width=max(0,min(160,int(160*float(level or 0))))
-        color='#3d9e7a' if level<0.8 else '#d4a017'
-        if level>=0.95:color='#c45c4a'
-        self.meter.create_rectangle(0,0,width,12,fill=color,outline='')
+        width=max(0,min(180,int(180*float(level or 0))))
+        color='#7CFF6B' if level<0.8 else '#FFB000'
+        if level>=0.95:color='#ff6b5a'
+        self.meter.create_rectangle(0,0,width,10,fill=color,outline='')
 
     def self_test(self):
         if self.self_testing:return
@@ -547,7 +593,7 @@ class App(tk.Tk):
             elif kind=='cat':
                 self.cat_status.set(str(value))
             elif kind=='monitor':
-                self.hear_button.configure(text='Mute speaker' if value else 'Hear audio')
+                self.hear_button.configure(text='MUTE' if value else 'HEAR AUDIO')
             elif kind=='station':
                 if region:self.lane_status[region].set('Receiver: '+str(value))
                 else:self.station.set(value)

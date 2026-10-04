@@ -11,6 +11,9 @@ ROOT=runtime_root()
 MODES={0:15,1:10,2:6,4:30,8:4}
 
 class EmbeddedDecoder:
+    # DLL decode uses process-wide static decoder objects; serialize all lanes.
+    process_lock=threading.Lock()
+
     def __init__(self,library=None):
         self.directory=Path(library).resolve().parent if library else ROOT/'bin'
         self.search=[]
@@ -57,7 +60,7 @@ class EmbeddedDecoder:
             except Exception as exc:
                 errors.append(str(exc))
         callback=self.callback_type(received)
-        with self.lock:
+        with EmbeddedDecoder.process_lock, self.lock:
             status=self.library.ghostnet_decode(data.ctypes.data_as(ctypes.POINTER(ctypes.c_int16)),
                 len(data),mode,int(utc),callback,None)
         if status<0 or errors:

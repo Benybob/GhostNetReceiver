@@ -1,6 +1,6 @@
 # Source and attribution
 
-GhostNet Receiver 0.4.0. Application and native adapter: GPL-3.0-or-later; see LICENSE. Corresponding application and native sources, build configuration, packaging specification and unsigned Inno Setup script accompany the Windows build.
+GhostNet Receiver 0.4.1. Application and native adapter: GPL-3.0-or-later; see LICENSE. Corresponding application and native sources, build configuration, packaging specification and unsigned Inno Setup script accompany the Windows build.
 
 JS8Call Improved 3.0.3, commit 4c592bd9a034f18178a3e7179db92acb14939668: https://github.com/JS8Call-improved/JS8Call-improved — GPL-3.0-or-later. Selected upstream files and vendored Eigen/CRCpp are under native/upstream. The generated engine omits the GUI worker and exposes synchronous receive callbacks. Numeric encoding math remains for receive signal subtraction. The recorded fixture comes from the original JS8Call media/tests corpus.
 

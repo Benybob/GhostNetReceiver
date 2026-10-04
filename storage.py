@@ -5,7 +5,7 @@ from pathlib import Path
 import shutil
 import sqlite3
 
-VERSION='0.4.0'
+VERSION='0.4.2'
 
 def runtime_root():
     """App files: source folder, or PyInstaller _internal when frozen."""

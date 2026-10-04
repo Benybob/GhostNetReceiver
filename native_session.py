@@ -502,7 +502,10 @@ class NativeSession:
                                     self.updates.put(('complete', complete))
                     else:
                         self.clock.push(samples, receipt)
-                    for mode, period in (speeds.items() if self.decode_mode == 'JS8' else ()):
+                    js8_modes = list(speeds.items()) if self.decode_mode == 'JS8' else []
+                    if js8_modes and not hunt_locked:
+                        js8_modes = [(mode, period) for mode, period in js8_modes if mode == 0] or js8_modes
+                    for mode, period in js8_modes:
                         hunts = HUNT_OFFSETS if (mode == 0 and not hunt_locked) else (HUNT_OFFSETS[hunt_index],)
                         grid_to_mark = None
                         matched = False
